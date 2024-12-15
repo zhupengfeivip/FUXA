@@ -232,7 +232,7 @@ function MQTTclient(_data, _logger, _events, _runtime) {
      * Return the timestamp of last read tag operation on polling
      * @returns
      */
-     this.lastReadTimestamp = () => {
+    this.lastReadTimestamp = () => {
         return lastTimestampValue;
     }
 
@@ -375,29 +375,44 @@ function MQTTclient(_data, _logger, _events, _runtime) {
                         reject(err);
                     } else {
                         client.on('message', function (topicAddr, msg, pkt) {
+                            // logger.debug(`${topicAddr} ${msg}`)
                             if (topicsMap[topicAddr]) {
                                 for (var i = 0; i < topicsMap[topicAddr].length; i++) {
-                                    var id = topicsMap[topicAddr][i].id;
-                                    var oldvalue = data.tags[id].rawValue;
-                                    data.tags[id].rawValue = msg.toString();
-                                    data.tags[id].timestamp = new Date().getTime();
-                                    data.tags[id].changed = oldvalue !== data.tags[id].rawValue;
+                                    var id = topicsMap[topicAddr][i].id
+                                    var oldvalue = data.tags[id].rawValue
+                                    data.tags[id].rawValue = msg.toString()
+                                    data.tags[id].timestamp = new Date().getTime()
+                                    data.tags[id].changed = oldvalue !== data.tags[id].rawValue
                                     if (data.tags[id].type === 'json' && data.tags[id].options && data.tags[id].options.subs && data.tags[id].memaddress) {
                                         try {
-                                            var subitems = JSON.parse(data.tags[id].rawValue);
-                                            if (!utils.isNullOrUndefined(subitems[data.tags[id].memaddress])) {
-                                                data.tags[id].rawValue = subitems[data.tags[id].memaddress];
+                                            var subitems = JSON.parse(data.tags[id].rawValue)
+                                            var memaddress = data.tags[id].memaddress
+                                            var val = subitems[memaddress]
+
+                                            if (!utils.isNullOrUndefined(val)) {
+                                                data.tags[id].rawValue = val
+                                                // logger.debug(`${memaddress} ${data.tags[id].rawValue}`)
+                                            } else if (Array.isArray(subitems)) {
+                                                for (let i = 0; i < subitems.length; i++) {
+                                                    const item = subitems[i]
+                                                    var k = memaddress
+                                                    if (item.k == k) {
+                                                        data.tags[id].rawValue = item.v
+                                                        // logger.debug(`${memaddress} ${data.tags[id].rawValue}`)
+                                                        break
+                                                    }
+                                                }
                                             } else {
-                                                data.tags[id].rawValue = oldvalue;
+                                                data.tags[id].rawValue = oldvalue
                                             }
                                         } catch (err) {
-                                            console.error(err);
+                                            logger.error(err)
                                         }
                                     }
                                 }
                             }
-                        });
-                        resolve();
+                        })
+                        resolve()
                     }
                 });
             } else {
@@ -421,7 +436,7 @@ function MQTTclient(_data, _logger, _events, _runtime) {
                             // for topic with json data with value from other device tags
                             // set the tag value in memory and publish the topic
                             for (var i = 0; i < refTagToTopics[event.id].topics.length; i++) {
-                                _publishValues([refTagToTopics[event.id].topics[i]]);
+                                _publishValues([refTagToTopics[event.id].topics[i]])
                             }
                         }
                     }
@@ -461,7 +476,7 @@ function MQTTclient(_data, _logger, _events, _runtime) {
     /**
      * Return the Topics to publish that have value changed and clear value changed flag of all Topics
      */
-     var _checkVarsChanged = async () => {
+    var _checkVarsChanged = async () => {
         const timestamp = new Date().getTime();
         var result = {};
         for (var id in data.tags) {
@@ -545,7 +560,7 @@ function MQTTclient(_data, _logger, _events, _runtime) {
                 if (tags[key].options && tags[key].options.pubs && tags[key].options.pubs.length) {
                     var topicTopuplish = {};
                     tags[key].options.pubs.forEach(item => {
-                        var value = '';
+                        var value = ''
                         if (item.type === 'tag' && item.value) {        // tag from other devices
                             if (memoryTagToPublish.has(item.value)) {
                                 value = memoryTagToPublish.get(item.value);
@@ -561,7 +576,7 @@ function MQTTclient(_data, _logger, _events, _runtime) {
                             topicTopuplish[item.key] = value;
                         } else {    // payloand with row data, item.key is ''
                             if (topicTopuplish[0]) {
-                                value = topicTopuplish[0] + ';' + value;
+                                value = topicTopuplish[0] + ';' + value
                             }
                             topicTopuplish[0] = value;
                         }
@@ -570,14 +585,15 @@ function MQTTclient(_data, _logger, _events, _runtime) {
                     if (tags[key].type === 'json') {
                         client.publish(tags[key].address, JSON.stringify(topicTopuplish), topicOptions);
                     } else if (topicTopuplish[0] !== undefined) { // payloand with row data
-                        client.publish(tags[key].address, Object.values(topicTopuplish)[0].toString(), topicOptions);
+                        client.publish(tags[key].address, Object.values(topicTopuplish)[0].toString(), topicOptions)
                     }
                 } else if (tags[key].type === 'json' && tags[key].options && tags[key].options.subs && tags[key].options.subs.length) {
                     let obj = {};
                     obj[tags[key].memaddress] = tags[key].value;
                     client.publish(tags[key].address, JSON.stringify(obj), topicOptions);
                 } else if (tags[key].value !== undefined) {   // whitout payload
-                    client.publish(tags[key].address, tags[key].value.toString(), topicOptions);
+                    // 发布修改值的mqtt消息
+                    client.publish(tags[key].address, tags[key].value.toString(), topicOptions)
                     tags[key].value = null;
                 }
             } catch (err) {

@@ -57,7 +57,7 @@ var log = module.exports = {
 
     debug: function (str, flag) {
         //	debug color: Cyan
-        console.log("\x1B[36m" + new Date().toISOString() + ' [DBG]  ' + "\t" + processInput(str) + "\x1B[39m");
+        console.log("\x1B[36m" + new Date().toISOString() + ' [DBG] ' + "\t" + processInput(str) + "\x1B[39m");
         if (initialized && (null == flag || true === flag)) {
             filelogger.debug(str);
         }
